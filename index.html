@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Study Buddy · Study Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/ionicons/7.1.0/ionicons.min.css">
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { 
+      font-family: 'Inter', system-ui, sans-serif; 
+      background: #f5f7fa; 
+      color: #1a1a2e; 
+      transition: background 0.3s ease, color 0.3s ease; 
+    }
+    
+    body.dark { 
+      background: #121212; 
+      color: #e0e0e0; 
+    }
+    
+    body.dark .app-header { 
+      background: #1e1e2e; 
+      border-bottom-color: #2a2a3a; 
+    }
+    
+    body.dark .sidebar { 
+      background: #1e1e2e; 
+    }
+    
+    body.dark .subject-item, 
+    body.dark .add-subject-area, 
+    body.dark .stat-card, 
+    body.dark .note-card, 
+    body.dark .session-summary,
+    body.dark .login-card {
+      background: #252535;
+      border-color: #3a3a4a;
+    }
+    
+    body.dark .time-input-wrapper,
+    body.dark .break-settings,
+    body.dark .quick-btn,
+    body.dark .subject-btn,
+    body.dark .small-btn {
+      background: #2a2a3a;
+      color: #e0e0e0;
+    }
+    
+    body.dark .input-field {
+      background: #2a2a3a;
+      border-color: #3a3a4a;
+      color: #e0e0e0;
+    }
+    
+    body.dark .modal-content {
+      background: #1e1e2e;
+      color: #e0e0e0;
+    }
+    
+    body.dark .chapter-item {
+      background: #2a2a3a;
+    }
+    
+    body.dark .sidebar-menu li.active {
+      background: #4a90e2;
+    }
+    
+    body.dark .sidebar-menu li:hover {
+      background: rgba(74, 144, 226, 0.2);
+    }
+    
+    #app { display: none; flex-direction: column; height: 100vh; max-width: 600px; margin: 0 auto; position: relative; overflow: hidden; background: inherit; }
+    .app-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #e0e0e0; background: white; z-index: 10; }
+    .menu-btn { background: none; border: none; font-size: 28px; cursor: pointer; color: inherit; width: 40px; height: 40px; border-radius: 20px; display: flex; align-items: center; justify-content: center; }
+    .app-title { font-size: 20px; font-weight: 600; flex: 1; }
+    .logout-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: #ff3b30; width: 40px; height: 40px; border-radius: 20px; display: flex; align-items: center; justify-content: center; }
+    .sidebar { position: fixed; top: 0; left: 0; width: 280px; height: 100%; background: white; transform: translateX(-100%); transition: transform 0.25s ease; z-index: 1000; padding: 20px 0; box-shadow: 2px 0 10px rgba(0,0,0,0.1); }
+    .sidebar.open { transform: translateX(0); }
+    .sidebar-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 999; opacity: 0; visibility: hidden; transition: 0.2s; }
+    .sidebar-overlay.visible { opacity: 1; visibility: visible; }
+    .sidebar-header { padding: 16px 20px; border-bottom: 1px solid #e0e0e0; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+    .sidebar-menu { list-style: none; }
+    .sidebar-menu li { padding: 14px 20px; font-size: 18px; cursor: pointer; display: flex; align-items: center; gap: 12px; border-radius: 12px; margin: 4px 12px; transition: background 0.2s; }
+    .sidebar-menu li:hover { background: rgba(74, 144, 226, 0.1); }
+    .sidebar-menu li.active { background: #4a90e2; color: white; }
+    .main-content { flex: 1; overflow-y: auto; padding: 20px 16px; }
+    .page { display: none; }
+    .page.active { display: block; }
+    .timer-container { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 65vh; }
+    .timer-display { font-family: 'DM Mono', monospace; font-size: 5rem; font-weight: 400; font-variant-numeric: tabular-nums; margin-bottom: 20px; text-align: center; background: linear-gradient(135deg, #2c3e50 0%, #1a1a2e 100%); background-clip: text; -webkit-background-clip: text; color: transparent; }
+    body.dark .timer-display { background: linear-gradient(135deg, #e0e0e0 0%, #ffffff 100%); background-clip: text; }
+    .time-input-wrapper { display: flex; align-items: center; justify-content: center; gap: 10px; background: #e8e8e8; border-radius: 60px; padding: 8px 20px; margin-bottom: 12px; }
+    .time-input-wrapper input { background: transparent; border: none; font-size: 1.8rem; width: 80px; text-align: center; font-weight: 500; color: inherit; outline: none; font-family: 'DM Mono', monospace; }
+    .quick-buttons { display: flex; gap: 8px; justify-content: center; margin: 12px 0; flex-wrap: wrap; }
+    .quick-btn, .subject-btn { background: #e8e8e8; border: none; padding: 8px 16px; border-radius: 30px; cursor: pointer; color: inherit; transition: background 0.2s; }
+    .quick-btn:hover, .subject-btn:hover { background: #4a90e2; color: white; }
+    .btn { background: #4a90e2; border: none; color: white; padding: 12px 20px; border-radius: 40px; font-size: 15px; font-weight: 600; min-width: 90px; cursor: pointer; transition: opacity 0.2s; }
+    .btn.outline { background: transparent; border: 2px solid #ff3b30; color: #ff3b30; }
+    .btn.warning { background: #ff9800; color: white; }
+    .btn.break-btn { background: #28a745; color: white; }
+    .controls { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 15px; }
+    .break-settings { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 15px; padding: 12px; background: #e8e8e8; border-radius: 40px; flex-wrap: wrap; }
+    .break-settings input { width: 70px; padding: 6px; border-radius: 20px; border: 1px solid #ccc; background: inherit; color: inherit; text-align: center; }
+    .subjects-list { display: flex; flex-direction: column; gap: 16px; margin-bottom: 20px; }
+    .subject-item { background: white; border-radius: 24px; padding: 16px; border: 1px solid #e0e0e0; }
+    .subject-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+    .subject-name { font-size: 18px; font-weight: 700; }
+    .progress-bar { background: #e0e0e0; border-radius: 20px; height: 8px; overflow: hidden; margin: 10px 0; }
+    .progress-fill { background: #4a90e2; width: 0%; height: 100%; }
+    .subject-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .small-btn { padding: 6px 12px; font-size: 13px; border-radius: 20px; background: #e8e8e8; border: none; cursor: pointer; }
+    .delete-btn { background: #ff3b30; color: white; }
+    .chapter-section { margin-top: 12px; padding-top: 12px; border-top: 1px solid #e0e0e0; }
+    .chapter-title { font-size: 14px; font-weight: 600; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+    .chapter-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; max-height: 200px; overflow-y: auto; }
+    .chapter-item { display: flex; justify-content: space-between; align-items: center; font-size: 13px; padding: 8px 12px; background: #f0f0f0; border-radius: 12px; }
+    .chapter-name { display: flex; align-items: center; gap: 8px; flex: 1; }
+    .chapter-checkbox { width: 18px; height: 18px; cursor: pointer; }
+    .add-chapter { display: flex; gap: 6px; margin-top: 10px; }
+    .add-chapter input { flex: 1; padding: 8px 12px; border-radius: 20px; border: 1px solid #ccc; background: inherit; color: inherit; font-size: 12px; }
+    .add-subject-area { background: white; border-radius: 24px; padding: 16px; margin-top: 10px; border: 1px solid #e0e0e0; }
+    .inline-input { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .inline-input input { flex: 1; padding: 10px; border-radius: 30px; border: 1px solid #ccc; background: inherit; color: inherit; }
+    .notes-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+    .create-note-btn { background: #4a90e2; color: white; border: none; padding: 10px 20px; border-radius: 30px; font-weight: 600; cursor: pointer; }
+    .notes-grid { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+    .note-card { background: white; border-radius: 20px; padding: 16px; cursor: pointer; border: 1px solid #e0e0e0; }
+    .note-title { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+    .delete-note-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: #ff3b30; float: right; }
+    .stats-grid { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .stat-card { background: white; padding: 15px; border-radius: 20px; flex: 1; min-width: 100px; text-align: center; border: 1px solid #e0e0e0; }
+    .stat-value { font-size: 2rem; font-weight: 700; font-family: 'DM Mono', monospace; }
+    .session-summary { background: white; border-radius: 20px; padding: 16px; margin-top: 20px; max-height: 400px; overflow-y: auto; border: 1px solid #e0e0e0; }
+    .session-item { padding: 12px; border-bottom: 1px solid #e0e0e0; font-size: 13px; }
+    .session-item strong { font-weight: 600; }
+    .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid #e0e0e0; }
+    .switch { position: relative; display: inline-block; width: 52px; height: 28px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider-round { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; border-radius: 34px; transition: .2s; }
+    .slider-round:before { position: absolute; content: ""; height: 22px; width: 22px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .2s; }
+    input:checked + .slider-round { background-color: #4a90e2; }
+    .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 2000; visibility: hidden; opacity: 0; transition: 0.2s; }
+    .modal.show { visibility: visible; opacity: 1; }
+    .modal-content { background: white; padding: 25px; border-radius: 28px; max-width: 400px; width: 90%; text-align: center; }
+    .logout-modal .modal-content, .notification-modal .modal-content, .confirm-modal .modal-content { max-width: 320px; }
+    .modal-buttons { display: flex; gap: 12px; justify-content: center; margin-top: 20px; }
+    .summary-modal .modal-content { max-width: 450px; text-align: left; }
+    .summary-stats { margin: 15px 0; padding: 10px; background: #f5f5f5; border-radius: 16px; }
+    body.dark .summary-stats { background: #2a2a3a; }
+    .summary-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #ddd; }
+    body.dark .summary-row { border-bottom-color: #3a3a4a; }
+    .summary-row:last-child { border-bottom: none; }
+    .note-modal .modal-content { max-width: 500px; text-align: left; }
+    .note-modal input, .note-modal textarea { width: 100%; padding: 12px; margin: 10px 0; border-radius: 16px; border: 1px solid #ccc; background: inherit; color: inherit; }
+    .note-modal textarea { min-height: 200px; resize: vertical; }
+    .label-item { padding: 12px; border-bottom: 1px solid #e0e0e0; cursor: pointer; }
+    .auth-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(145deg, #f6f2ee 0%, #e8e2da 100%);
+      z-index: 3000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    body.dark .auth-overlay { background: #0f0f1a; }
+    .login-card {
+      max-width: 420px;
+      width: 90%;
+      background: white;
+      border-radius: 32px;
+      box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.2);
+      padding: 2rem;
+    }
+    .brand-header { text-align: center; margin-bottom: 1.8rem; }
+    .ornament { font-size: 2rem; color: #b87c4f; }
+    .login-card h1 { font-size: 1.9rem; margin-bottom: 0.25rem; }
+    .input-group { margin-bottom: 1.2rem; text-align: left; }
+    .input-group label { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #6b5a4b; }
+    .input-field { width: 100%; padding: 0.9rem 1.2rem; border-radius: 40px; border: 1px solid #e2d5ca; background: #fefcf9; font-size: 1rem; }
+    .signin-btn { background: #2e2a27; width: 100%; padding: 0.9rem; border-radius: 40px; color: white; font-weight: 600; border: none; cursor: pointer; transition: 0.2s; margin-top: 0.5rem; }
+    .signin-btn:hover { background: #3f352e; }
+    .signin-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .error-msg { color: #d9534f; font-size: 0.8rem; margin-top: 12px; text-align: center; }
+    .clear-btn { background: transparent; border: 1px solid #ff3b30; color: #ff3b30; padding: 12px; border-radius: 40px; width: 100%; cursor: pointer; margin-top: 10px; }
+    .del-chapter-btn { background: #ff3b30; color: white; border: none; padding: 4px 10px; border-radius: 16px; cursor: pointer; font-size: 12px; }
+    @media (max-width: 480px) { .timer-display { font-size: 3.5rem; } .btn { padding: 8px 12px; font-size: 12px; min-width: 70px; } }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div class="app-header">
+    <button class="menu-btn" id="menuToggle">☰</button>
+    <span class="app-title">Study Buddy</span>
+    <button class="logout-btn" id="logoutBtn" title="Logout">🚪</button>
+  </div>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h3>Menu</h3>
+      <button class="small-btn" id="closeSidebarBtn" style="padding: 4px 12px;">✕</button>
+    </div>
+    <ul class="sidebar-menu">
+      <li data-page="timer" class="active"><ion-icon name="timer-outline"></ion-icon> Timer</li>
+      <li data-page="subjects"><ion-icon name="book-outline"></ion-icon> Subjects</li>
+      <li data-page="notes"><ion-icon name="document-text-outline"></ion-icon> Notes</li>
+      <li data-page="stats"><ion-icon name="stats-chart-outline"></ion-icon> Statistics</li>
+      <li data-page="settings"><ion-icon name="settings-outline"></ion-icon> Settings</li>
+    </ul>
+  </div>
+  <div class="main-content">
+    <div id="page-timer" class="page active">
+      <div class="timer-container">
+        <div class="timer-display" id="timerDisplay">00:25:00</div>
+        <div class="time-input-wrapper">
+          <input type="number" id="hoursInput" min="0" max="23" value="0" placeholder="HH">
+          <span>:</span>
+          <input type="number" id="minutesInput" min="0" max="59" value="25" placeholder="MM">
+        </div>
+        <div class="quick-buttons">
+          <button class="quick-btn" data-minutes="5">5m</button>
+          <button class="quick-btn" data-minutes="15">15m</button>
+          <button class="quick-btn" data-minutes="25">25m</button>
+          <button class="quick-btn" data-minutes="45">45m</button>
+          <button class="quick-btn" data-minutes="60">1h</button>
+        </div>
+        <div class="subject-selector">
+          <button class="subject-btn" id="subjectSelectBtn">Subject: <span id="currentSubject">Mathematics</span></button>
+        </div>
+        <div class="controls" id="timerControls"></div>
+        <div class="break-settings">
+          <label>🍵 Break Duration:</label>
+          <input type="number" id="breakDurationInput" min="5" max="60" value="5" step="1"> min
+        </div>
+        <div class="phase-tag" id="phaseIndicator"></div>
+      </div>
+    </div>
+    <div id="page-subjects" class="page">
+      <h2 style="margin-bottom:16px;">📚 My Subjects</h2>
+      <div id="subjectsList" class="subjects-list"></div>
+      <div class="add-subject-area">
+        <strong>➕ Add New Subject</strong>
+        <div class="inline-input">
+          <input type="text" id="newSubjName" placeholder="Subject name">
+          <input type="text" id="newUnitName" placeholder="Unit name" value="chapters">
+          <input type="number" id="newTotalUnits" placeholder="Total units" value="10" min="1" style="width:80px">
+          <button id="addSubjectBtn" class="small-btn" style="background:#4a90e2;color:white;">Add</button>
+        </div>
+      </div>
+    </div>
+    <div id="page-notes" class="page">
+      <div class="notes-header"><h2>📝 My Notes</h2><button class="create-note-btn" id="createNoteBtn">+ New Note</button></div>
+      <div id="notesList" class="notes-grid"></div>
+    </div>
+    <div id="page-stats" class="page">
+      <h2 style="margin-bottom:16px;">📊 Study Statistics</h2>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-value" id="totalTime">0h 0m</div><div>Total studied</div></div>
+        <div class="stat-card"><div class="stat-value" id="totalSessions">0</div><div>Sessions</div></div>
+        <div class="stat-card"><div class="stat-value" id="totalBreaks">0</div><div>Breaks</div></div>
+      </div>
+      <div class="stat-card"><div class="stat-value" id="todayTime">0m</div><div id="todaySessionsLabel">0 sessions today</div></div>
+      <div class="session-summary">
+        <h3 style="margin-bottom:12px;">📋 All Session History</h3>
+        <div id="allSessionsList"></div>
+      </div>
+      <button class="clear-btn" id="clearHistoryBtn">Clear All History</button>
+    </div>
+    <div id="page-settings" class="page">
+      <h2 style="margin-bottom:16px;">⚙️ Settings</h2>
+      <div class="setting-row"><span>🌙 Dark Mode</span><label class="switch"><input type="checkbox" id="darkModeToggle"><span class="slider-round"></span></label></div>
+      <div class="setting-row"><span>🔊 Sound Alerts</span><label class="switch"><input type="checkbox" id="soundToggle" checked><span class="slider-round"></span></label></div>
+      <div class="setting-row"><span>🔉 Volume</span><input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="0.7" style="width:120px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Auth Overlay -->
+<div id="authOverlay" class="auth-overlay">
+  <div class="login-card">
+    <div class="brand-header"><div class="ornament">✦</div><h1>Study Buddy</h1><div style="color:#8f7a68; margin-top:5px;">Sign in to continue</div></div>
+    <form id="authForm">
+      <div class="input-group"><label>Email</label><input type="email" id="loginEmail" class="input-field" placeholder="your@email.com" required></div>
+      <div class="input-group"><label>Password</label><input type="password" id="loginPassword" class="input-field" placeholder="••••••••" required></div>
+      <button type="submit" class="signin-btn" id="signInButton">Sign in →</button>
+      <div id="authError" class="error-msg"></div>
+    </form>
+  </div>
+</div>
+
+<!-- Logout Confirmation Modal -->
+<div class="modal logout-modal" id="logoutModal">
+  <div class="modal-content">
+    <div class="modal-title" style="font-size: 1.4rem; margin-bottom: 15px;">🚪 Logout</div>
+    <div class="modal-message" style="margin: 10px 0;">Are you sure you want to logout?</div>
+    <div class="modal-buttons">
+      <button class="btn" id="confirmLogoutBtn" style="background: #ff3b30;">Yes, Logout</button>
+      <button class="btn outline" id="cancelLogoutBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal confirm-modal" id="deleteConfirmModal">
+  <div class="modal-content">
+    <div class="modal-title" style="font-size: 1.4rem; margin-bottom: 15px;">🗑️ Confirm Delete</div>
+    <div class="modal-message" id="deleteConfirmMessage" style="margin: 10px 0;"></div>
+    <div class="modal-buttons">
+      <button class="btn" id="confirmDeleteBtn" style="background: #ff3b30;">Delete</button>
+      <button class="btn outline" id="cancelDeleteBtn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Notification Modal -->
+<div class="modal notification-modal" id="notificationModal">
+  <div class="modal-content">
+    <div class="modal-title" id="notificationTitle" style="font-size: 1.4rem; margin-bottom: 15px;">🔔 Notification</div>
+    <div class="modal-message" id="notificationMessage" style="margin: 10px 0;"></div>
+    <div class="modal-buttons">
+      <button class="btn" id="closeNotificationBtn" style="background: #4a90e2;">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- Other Modals -->
+<div class="modal" id="completionModal"><div class="modal-content"><div class="modal-title">🎉 Session Complete!</div><div class="modal-message" id="completionMsg"></div><button class="btn" id="closeModalBtn">Done</button></div></div>
+<div class="modal summary-modal" id="summaryModal"><div class="modal-content"><div class="modal-title">📊 Session Summary</div><div id="summaryContent"></div><button class="btn" id="closeSummaryBtn">Close</button></div></div>
+<div class="modal subject-modal" id="subjectModal"><div class="modal-content"><div class="modal-title">Select Subject</div><div id="subjectList"></div><button class="btn" id="closeSubjectModal">Close</button></div></div>
+<div class="modal note-modal" id="noteModal"><div class="modal-content"><div class="modal-title" id="noteModalTitle">New Note</div><input type="text" id="noteTitleInput" placeholder="Title"><textarea id="noteContentInput" placeholder="Write your notes here..."></textarea><button class="btn" id="saveNoteBtn">Save</button><button class="btn outline" id="cancelNoteBtn">Cancel</button></div></div>
+<div class="modal" id="viewNoteModal"><div class="modal-content"><div class="modal-title" id="viewNoteTitle"></div><div class="modal-message" id="viewNoteContent" style="text-align:left; white-space:pre-wrap;"></div><button class="btn" id="closeViewNoteBtn">Close</button></div></div>
+<div class="modal" id="accessDeniedModal"><div class="modal-content"><div class="modal-title">⛔ Access Denied</div><div class="modal-message" style="margin:15px 0;">Contact creator on Instagram <strong>@aatifdecoded</strong><br>or email <strong>aatifthebrand@gmail.com</strong></div><button class="btn" id="closeDeniedModal">OK</button></div></div>
+
+<audio id="alarmSound" src="https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3" preload="auto"></audio>
+<audio id="beepSound" src="https://www.soundjay.com/misc/sounds/beep-07.mp3" preload="auto"></audio>
+
+<script>
+  // Firebase Config
+  const firebaseConfig = {
+    apiKey: "AIzaSyCSquRipkwrLe1WuWkd5Z4a9h-elGBIsR8",
+    authDomain: "studybuddy-803bc.firebaseapp.com",
+    projectId: "studybuddy-803bc",
+    storageBucket: "studybuddy-803bc.firebasestorage.app",
+    messagingSenderId: "815920456850",
+    appId: "1:815920456850:web:c27fc21d609e2cdefc724b",
+    measurementId: "G-845GCDHSJD"
+  };
+  
+  const app = firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+  auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+  
+  let currentUser = null;
+  let store = { subjects: [], sessions: [], breakSessions: [], notes: [], settings: {} };
+  let saveTimeout = null;
+  let pendingDeleteAction = null;
+  let isInitialLoad = true;
+  
+  let timerState = {
+    duration: 1500,
+    remaining: 1500,
+    isRunning: false,
+    isBreak: false,
+    intervalId: null,
+    selectedSubjectId: 1,
+    breakDuration: 300,
+    pauseCount: 0,
+    breakTaken: false,
+    breakCompleted: false,
+    breakDurationActual: 0,
+    sessionStartTime: null,
+    breakStartTime: null,
+    studyTimeRemainingBeforeBreak: 0
+  };
+  
+  function formatTime(seconds) {
+    let hrs = Math.floor(seconds / 3600);
+    let mins = Math.floor((seconds % 3600) / 60);
+    let secs = seconds % 60;
+    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+  
+  function formatShort(seconds) {
+    let hrs = Math.floor(seconds / 3600);
+    let mins = Math.floor((seconds % 3600) / 60);
+    return hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
+  }
+  
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[m]);
+  }
+  
+  function showNotification(title, message) {
+    document.getElementById('notificationTitle').textContent = title;
+    document.getElementById('notificationMessage').innerHTML = message;
+    document.getElementById('notificationModal').classList.add('show');
+  }
+  
+  function showDeleteConfirm(message, onConfirm) {
+    pendingDeleteAction = onConfirm;
+    document.getElementById('deleteConfirmMessage').innerHTML = message;
+    document.getElementById('deleteConfirmModal').classList.add('show');
+  }
+  
+  function hideDeleteConfirm() {
+    document.getElementById('deleteConfirmModal').classList.remove('show');
+    pendingDeleteAction = null;
+  }
+  
+  function playAlarm() {
+    let alarm = document.getElementById('alarmSound');
+    if (alarm && store.settings.soundEnabled !== false) {
+      alarm.volume = store.settings.alarmVolume || 0.7;
+      alarm.currentTime = 0;
+      alarm.play().catch(e => console.log('Audio play failed'));
+    }
+  }
+  
+  function playBeep() {
+    let beep = document.getElementById('beepSound');
+    if (beep && store.settings.soundEnabled !== false) {
+      beep.volume = store.settings.alarmVolume || 0.7;
+      beep.currentTime = 0;
+      beep.play().catch(e => console.log('Audio play failed'));
+    }
+  }
+  
+  async function saveToFirestore() {
+    if (!currentUser) return;
+    if (saveTimeout) clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(async () => {
+      try {
+        await db.collection('users').doc(currentUser.uid).set({
+          data: store,
+          lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+      } catch(e) {
+        console.warn('Firestore save error:', e);
+      }
+      saveTimeout = null;
+    }, 500);
+  }
+  
+  async function loadFromFirestore() {
+    if (!currentUser) return;
+    try {
+      const doc = await db.collection('users').doc(currentUser.uid).get();
+      if (doc.exists && doc.data().data) {
+        store = doc.data().data;
+      }
+    } catch(e) {
+      console.warn('Firestore load error:', e);
+    }
+    
+    if (!store.subjects || store.subjects.length === 0) {
+      store.subjects = [
+        { id: 1, name: "Mathematics", unitName: "chapters", totalUnits: 12, completedUnits: 3, totalStudySeconds: 3600, chapters: ["Algebra Basics", "Quadratic Equations", "Trigonometry"], completedChapters: ["Algebra Basics"] },
+        { id: 2, name: "Physics", unitName: "topics", totalUnits: 8, completedUnits: 2, totalStudySeconds: 2700, chapters: ["Newton's Laws", "Thermodynamics", "Optics"], completedChapters: ["Newton's Laws"] },
+        { id: 3, name: "Chemistry", unitName: "chapters", totalUnits: 10, completedUnits: 1, totalStudySeconds: 1800, chapters: ["Periodic Table", "Chemical Bonding"], completedChapters: [] }
+      ];
+    }
+    if (!store.sessions) store.sessions = [];
+    if (!store.breakSessions) store.breakSessions = [];
+    if (!store.notes) store.notes = [];
+    if (!store.settings) store.settings = { darkMode: false, soundEnabled: true, alarmVolume: 0.7 };
+    
+    await saveToFirestore();
+  }
+  
+  function getSelectedSubject() {
+    return store.subjects.find(s => s.id === timerState.selectedSubjectId) || store.subjects[0];
+  }
+  
+  function updateSubjectButton() {
+    let sub = getSelectedSubject();
+    document.getElementById('currentSubject').textContent = sub ? sub.name : 'None';
+  }
+  
+  function updateTimerDisplay() {
+    document.getElementById('timerDisplay').textContent = formatTime(timerState.remaining);
+  }
+  
+  async function saveSessionAndShowSummary(subject, studiedSec, isEarlyEnd = false) {
+    let breakInfo = {
+      taken: timerState.breakTaken,
+      completed: timerState.breakCompleted,
+      duration: timerState.breakDurationActual
+    };
+    
+    let sessionData = {
+      id: Date.now(),
+      subjectId: subject?.id,
+      subjectName: subject?.name,
+      duration: studiedSec,
+      pauseCount: timerState.pauseCount,
+      breakTaken: timerState.breakTaken,
+      breakCompleted: timerState.breakCompleted,
+      breakDuration: timerState.breakDurationActual,
+      isEarlyEnd: isEarlyEnd,
+      timestamp: new Date().toISOString(),
+      date: new Date().toLocaleDateString(),
+      time: new Date().toLocaleTimeString()
+    };
+    
+    store.sessions.unshift(sessionData);
+    await saveToFirestore();
+    
+    let summaryHtml = `
+      <div class="summary-stats">
+        <div class="summary-row"><strong>📖 Subject:</strong> <span>${escapeHtml(subject?.name)}</span></div>
+        <div class="summary-row"><strong>⏱️ Study Duration:</strong> <span>${formatShort(studiedSec)}</span></div>
+        <div class="summary-row"><strong>⏸️ Pauses:</strong> <span>${timerState.pauseCount} time${timerState.pauseCount !== 1 ? 's' : ''}</span></div>
+        <div class="summary-row"><strong>🍵 Break Taken:</strong> <span>${breakInfo.taken ? 'Yes' : 'No'}</span></div>
+        ${breakInfo.taken ? `<div class="summary-row"><strong>⏲️ Break Duration:</strong> <span>${breakInfo.completed ? formatShort(breakInfo.duration) : 'Incomplete (skipped)'}</span></div>` : ''}
+      </div>
+    `;
+    
+    document.getElementById('summaryContent').innerHTML = summaryHtml;
+    document.getElementById('summaryModal').classList.add('show');
+    updateStats();
+    renderSubjects();
+  }
+  
+  function startTimer() {
+    if (timerState.isRunning) return;
+    
+    if (!timerState.sessionStartTime && !timerState.isBreak) {
+      timerState.sessionStartTime = Date.now();
+      timerState.pauseCount = 0;
+      timerState.breakTaken = false;
+      timerState.breakCompleted = false;
+      timerState.breakDurationActual = 0;
+    }
+    
+    timerState.isRunning = true;
+    timerState.intervalId = setInterval(async () => {
+      if (timerState.remaining <= 0) {
+        clearInterval(timerState.intervalId);
+        timerState.isRunning = false;
+        
+        if (timerState.isBreak) {
+          timerState.breakCompleted = true;
+          timerState.breakDurationActual = timerState.breakDuration;
+          timerState.isBreak = false;
+          timerState.remaining = timerState.studyTimeRemainingBeforeBreak;
+          timerState.studyTimeRemainingBeforeBreak = 0;
+          updateTimerDisplay();
+          document.getElementById('phaseIndicator').textContent = '';
+          playBeep();
+          renderTimerControls();
+          showNotification("🍵 Break Complete", "Your break is over! Resuming study session.");
+          startTimer();
+        } else {
+          let studiedSec = timerState.duration;
+          let subject = getSelectedSubject();
+          if (subject) {
+            subject.totalStudySeconds += studiedSec;
+            await saveToFirestore();
+          }
+          
+          await saveSessionAndShowSummary(subject, studiedSec, false);
+          playAlarm();
+          showNotification("🎉 Session Complete!", `You completed ${formatShort(studiedSec)} of ${subject?.name || 'study'}!`);
+          
+          timerState.isBreak = false;
+          timerState.remaining = timerState.duration;
+          updateTimerDisplay();
+          document.getElementById('phaseIndicator').textContent = '';
+          renderTimerControls();
+        }
+        renderTimerControls();
+        updateStats();
+        renderSubjects();
+      } else {
+        timerState.remaining--;
+        updateTimerDisplay();
+      }
+    }, 1000);
+    renderTimerControls();
+  }
+  
+  function pauseTimer() {
+    if (timerState.isRunning) {
+      clearInterval(timerState.intervalId);
+      timerState.isRunning = false;
+      timerState.pauseCount++;
+      renderTimerControls();
+    }
+  }
+  
+  function resetTimer() {
+    clearInterval(timerState.intervalId);
+    timerState.isRunning = false;
+    timerState.isBreak = false;
+    timerState.remaining = timerState.duration;
+    timerState.pauseCount = 0;
+    timerState.breakTaken = false;
+    timerState.breakCompleted = false;
+    timerState.breakDurationActual = 0;
+    timerState.sessionStartTime = null;
+    timerState.breakStartTime = null;
+    timerState.studyTimeRemainingBeforeBreak = 0;
+    updateTimerDisplay();
+    document.getElementById('phaseIndicator').textContent = '';
+    renderTimerControls();
+  }
+  
+  function startBreak() {
+    if (timerState.isRunning) pauseTimer();
+    timerState.studyTimeRemainingBeforeBreak = timerState.remaining;
+    timerState.isBreak = true;
+    timerState.breakTaken = true;
+    timerState.remaining = timerState.breakDuration;
+    timerState.breakStartTime = Date.now();
+    updateTimerDisplay();
+    document.getElementById('phaseIndicator').textContent = `🍵 BREAK - ${Math.floor(timerState.breakDuration / 60)} min`;
+    startTimer();
+  }
+  
+  function skipBreak() {
+    if (timerState.isBreak) {
+      let breakElapsed = timerState.breakDuration - timerState.remaining;
+      timerState.breakDurationActual = breakElapsed;
+      timerState.breakCompleted = false;
+      
+      clearInterval(timerState.intervalId);
+      timerState.isRunning = false;
+      timerState.isBreak = false;
+      timerState.remaining = timerState.studyTimeRemainingBeforeBreak;
+      timerState.studyTimeRemainingBeforeBreak = 0;
+      updateTimerDisplay();
+      document.getElementById('phaseIndicator').textContent = '';
+      playBeep();
+      renderTimerControls();
+      showNotification("⏩ Break Skipped", "Break skipped. Resuming study session.");
+    }
+  }
+  
+  function endSessionEarly() {
+    if ((timerState.isRunning || timerState.pauseCount > 0) && !timerState.isBreak) {
+      let studiedSec = timerState.duration - timerState.remaining;
+      if (studiedSec > 0) {
+        let subject = getSelectedSubject();
+        if (subject) {
+          subject.totalStudySeconds += studiedSec;
+        }
+        
+        if (timerState.breakTaken && !timerState.breakCompleted && timerState.breakStartTime) {
+          let breakElapsed = Math.floor((Date.now() - timerState.breakStartTime) / 1000);
+          timerState.breakDurationActual = Math.min(breakElapsed, timerState.breakDuration);
+        }
+        
+        saveSessionAndShowSummary(subject, studiedSec, true);
+        playBeep();
+        showNotification("🏁 Session Ended Early", `You studied ${formatShort(studiedSec)} before ending early.`);
+      }
+    }
+    resetTimer();
+  }
+  
+  function renderTimerControls() {
+    let controlsDiv = document.getElementById('timerControls');
+    if (!controlsDiv) return;
+    
+    if (timerState.isBreak) {
+      controlsDiv.innerHTML = `<button class="btn" id="skipBreakBtn">⏩ Skip Break</button>`;
+      document.getElementById('skipBreakBtn')?.addEventListener('click', skipBreak);
+      return;
+    }
+    
+    if (timerState.isRunning) {
+      controlsDiv.innerHTML = `
+        <button class="btn" id="pauseBtn">⏸ Pause</button>
+        <button class="btn break-btn" id="breakBtn">🍵 Break</button>
+        <button class="btn outline" id="resetBtn">⟳ Reset</button>
+        <button class="btn warning" id="endBtn">🏁 End Session</button>
+      `;
+    } else {
+      controlsDiv.innerHTML = `
+        <button class="btn" id="startBtn">▶ Start</button>
+        <button class="btn break-btn" id="breakBtn">🍵 Break</button>
+        <button class="btn outline" id="resetBtn">⟳ Reset</button>
+      `;
+    }
+    
+    document.getElementById('startBtn')?.addEventListener('click', startTimer);
+    document.getElementById('pauseBtn')?.addEventListener('click', pauseTimer);
+    document.getElementById('resetBtn')?.addEventListener('click', resetTimer);
+    document.getElementById('breakBtn')?.addEventListener('click', startBreak);
+    document.getElementById('endBtn')?.addEventListener('click', endSessionEarly);
+  }
+  
+  function renderSubjects() {
+    let container = document.getElementById('subjectsList');
+    if (!container) return;
+    container.innerHTML = '';
+    
+    store.subjects.forEach(sub => {
+      let percent = sub.totalUnits ? (sub.completedUnits / sub.totalUnits) * 100 : 0;
+      let card = document.createElement('div');
+      card.className = 'subject-item';
+      card.innerHTML = `
+        <div class="subject-header">
+          <span class="subject-name">📖 ${escapeHtml(sub.name)}</span>
+          <span>${((sub.totalStudySeconds||0)/3600).toFixed(1)} hrs</span>
+        </div>
+        <div>${sub.unitName}: ${sub.completedUnits}/${sub.totalUnits}</div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${percent}%"></div></div>
+        <div class="subject-actions">
+          <button class="small-btn inc-unit" data-id="${sub.id}">+1 ${sub.unitName}</button>
+          <button class="small-btn dec-unit" data-id="${sub.id}">-1</button>
+          <button class="small-btn delete-btn" data-id="${sub.id}">Delete</button>
+        </div>
+        <div class="chapter-section">
+          <div class="chapter-title">
+            <span>📑 Chapters / Topics</span>
+            <button class="small-btn add-chapter-main" data-id="${sub.id}" style="padding:2px 10px;">+ Add</button>
+          </div>
+          <div class="chapter-list" id="chapters-${sub.id}"></div>
+          <div class="add-chapter" id="addChapterForm-${sub.id}" style="display:none;">
+            <input type="text" id="newChapterInput-${sub.id}" placeholder="New chapter name">
+            <button class="small-btn save-chapter-btn" data-id="${sub.id}">Save</button>
+            <button class="small-btn cancel-chapter-btn" data-id="${sub.id}">Cancel</button>
+          </div>
+        </div>
+      `;
+      container.appendChild(card);
+      
+      let chapterList = card.querySelector(`#chapters-${sub.id}`);
+      if (chapterList) {
+        let chapters = sub.chapters || [];
+        chapters.forEach(ch => {
+          let isChecked = sub.completedChapters?.includes(ch) || false;
+          let div = document.createElement('div');
+          div.className = 'chapter-item';
+          div.innerHTML = `
+            <div class="chapter-name">
+              <input type="checkbox" class="chapter-checkbox" data-sub="${sub.id}" data-chapter="${escapeHtml(ch)}" ${isChecked ? 'checked' : ''}>
+              <span style="${isChecked ? 'text-decoration: line-through; opacity: 0.7;' : ''}">${escapeHtml(ch)}</span>
+            </div>
+            <button class="del-chapter-btn" data-sub="${sub.id}" data-chapter="${escapeHtml(ch)}">✖</button>
+          `;
+          chapterList.appendChild(div);
+        });
+      }
+      
+      let addBtn = card.querySelector(`.add-chapter-main`);
+      let addForm = card.querySelector(`#addChapterForm-${sub.id}`);
+      addBtn.onclick = () => {
+        addForm.style.display = addForm.style.display === 'none' ? 'flex' : 'none';
+      };
+      
+      card.querySelector(`.cancel-chapter-btn`)?.addEventListener('click', () => {
+        addForm.style.display = 'none';
+      });
+      
+      card.querySelector(`.save-chapter-btn`)?.addEventListener('click', async () => {
+        let input = document.getElementById(`newChapterInput-${sub.id}`);
+        let chapName = input.value.trim();
+        if (chapName) {
+          if (!sub.chapters) sub.chapters = [];
+          if (!sub.completedChapters) sub.completedChapters = [];
+          sub.chapters.push(chapName);
+          await saveToFirestore();
+          renderSubjects();
+          showNotification("📑 Chapter Added", `"${chapName}" added to ${sub.name}`);
+        }
+      });
+    });
+    
+    document.querySelectorAll('.inc-unit').forEach(btn => btn.addEventListener('click', async () => {
+      let id = parseInt(btn.dataset.id);
+      let s = store.subjects.find(s => s.id === id);
+      if (s && s.completedUnits < s.totalUnits) { s.completedUnits++; await saveToFirestore(); renderSubjects(); }
+    }));
+    
+    document.querySelectorAll('.dec-unit').forEach(btn => btn.addEventListener('click', async () => {
+      let id = parseInt(btn.dataset.id);
+      let s = store.subjects.find(s => s.id === id);
+      if (s && s.completedUnits > 0) { s.completedUnits--; await saveToFirestore(); renderSubjects(); }
+    }));
+    
+    document.querySelectorAll('.delete-btn').forEach(btn => btn.addEventListener('click', async () => {
+      let id = parseInt(btn.dataset.id);
+      let subject = store.subjects.find(s => s.id === id);
+      showDeleteConfirm(`Are you sure you want to delete "${subject?.name}"? This action cannot be undone.`, async () => {
+        store.subjects = store.subjects.filter(s => s.id !== id);
+        if (timerState.selectedSubjectId === id && store.subjects.length) timerState.selectedSubjectId = store.subjects[0].id;
+        await saveToFirestore();
+        renderSubjects();
+        updateSubjectButton();
+        showNotification("🗑️ Subject Deleted", `"${subject?.name}" has been removed.`);
+        hideDeleteConfirm();
+      });
+    }));
+    
+    document.querySelectorAll('.chapter-checkbox').forEach(cb => cb.addEventListener('change', async () => {
+      let subId = parseInt(cb.dataset.sub);
+      let chapName = cb.dataset.chapter;
+      let sub = store.subjects.find(s => s.id === subId);
+      if (!sub.completedChapters) sub.completedChapters = [];
+      if (cb.checked) {
+        if (!sub.completedChapters.includes(chapName)) sub.completedChapters.push(chapName);
+        showNotification("✅ Chapter Completed", `"${chapName}" marked as completed!`);
+      } else {
+        sub.completedChapters = sub.completedChapters.filter(c => c !== chapName);
+      }
+      await saveToFirestore();
+      renderSubjects();
+    }));
+    
+    document.querySelectorAll('.del-chapter-btn').forEach(btn => btn.addEventListener('click', async () => {
+      let subId = parseInt(btn.dataset.sub);
+      let chapName = btn.dataset.chapter;
+      let sub = store.subjects.find(s => s.id === subId);
+      showDeleteConfirm(`Are you sure you want to delete chapter "${chapName}" from "${sub?.name}"?`, async () => {
+        if (sub.chapters) sub.chapters = sub.chapters.filter(c => c !== chapName);
+        if (sub.completedChapters) sub.completedChapters = sub.completedChapters.filter(c => c !== chapName);
+        await saveToFirestore();
+        renderSubjects();
+        showNotification("📑 Chapter Removed", `"${chapName}" has been removed.`);
+        hideDeleteConfirm();
+      });
+    }));
+  }
+  
+  function renderNotes() {
+    let container = document.getElementById('notesList');
+    if (!container) return;
+    let notes = [...store.notes].reverse();
+    container.innerHTML = notes.map(n => `
+      <div class="note-card" data-id="${n.id}">
+        <span class="delete-note-btn" data-id="${n.id}">🗑️</span>
+        <div class="note-title">📄 ${escapeHtml(n.title)}</div>
+        <div class="note-preview">${escapeHtml(n.content.substring(0, 80))}</div>
+      </div>
+    `).join('');
+    
+    document.querySelectorAll('.delete-note-btn').forEach(btn => btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      let id = parseInt(btn.dataset.id);
+      let note = store.notes.find(n => n.id === id);
+      showDeleteConfirm(`Are you sure you want to delete "${note?.title}"?`, async () => {
+        store.notes = store.notes.filter(n => n.id !== id);
+        await saveToFirestore();
+        renderNotes();
+        showNotification("📝 Note Deleted", "Your note has been deleted.");
+        hideDeleteConfirm();
+      });
+    }));
+    
+    document.querySelectorAll('.note-card').forEach(card => card.addEventListener('click', (e) => {
+      if (e.target.classList.contains('delete-note-btn')) return;
+      let note = store.notes.find(n => n.id === parseInt(card.dataset.id));
+      if (note) {
+        document.getElementById('viewNoteTitle').textContent = note.title;
+        document.getElementById('viewNoteContent').textContent = note.content;
+        document.getElementById('viewNoteModal').classList.add('show');
+      }
+    }));
+  }
+  
+  function updateStats() {
+    let totalSec = store.sessions.reduce((s, ss) => s + ss.duration, 0);
+    document.getElementById('totalTime').textContent = formatShort(totalSec);
+    document.getElementById('totalSessions').textContent = store.sessions.length;
+    document.getElementById('totalBreaks').textContent = store.breakSessions.length;
+    
+    let todayStr = new Date().toDateString();
+    let todaySessions = store.sessions.filter(s => new Date(s.timestamp).toDateString() === todayStr);
+    let todaySec = todaySessions.reduce((s, ss) => s + ss.duration, 0);
+    document.getElementById('todayTime').textContent = formatShort(todaySec);
+    document.getElementById('todaySessionsLabel').textContent = `${todaySessions.length} sessions today`;
+    
+    let allSessionsHtml = store.sessions.map(s => `
+      <div class="session-item">
+        <strong>📖 ${escapeHtml(s.subjectName)}</strong><br>
+        ⏱️ Studied: ${formatShort(s.duration)} | ⏸️ Pauses: ${s.pauseCount}<br>
+        🍵 Break: ${s.breakTaken ? (s.breakCompleted ? `Completed (${formatShort(s.breakDuration)})` : 'Skipped') : 'None'}<br>
+        📅 ${new Date(s.timestamp).toLocaleString()}
+        ${s.isEarlyEnd ? '<span style="color:#ff9800;"> (Ended early)</span>' : ''}
+      </div>
+    `).join('');
+    
+    document.getElementById('allSessionsList').innerHTML = allSessionsHtml || '<div>No sessions yet</div>';
+  }
+  
+  function showLogoutModal() {
+    document.getElementById('logoutModal').classList.add('show');
+  }
+  
+  function hideLogoutModal() {
+    document.getElementById('logoutModal').classList.remove('show');
+  }
+  
+  function performLogout() {
+    hideLogoutModal();
+    if (timerState.intervalId) {
+      clearInterval(timerState.intervalId);
+      timerState.isRunning = false;
+    }
+    auth.signOut().then(() => {
+      // Auth state change will handle UI update
+    }).catch(err => {
+      console.log('Logout error:', err);
+    });
+  }
+  
+  async function initApp() {
+    await loadFromFirestore();
+    renderSubjects();
+    renderNotes();
+    updateStats();
+    updateSubjectButton();
+    renderTimerControls();
+    
+    timerState.duration = 1500;
+    timerState.remaining = 1500;
+    timerState.breakDuration = parseInt(document.getElementById('breakDurationInput').value) * 60 || 300;
+    updateTimerDisplay();
+    
+    let hoursInput = document.getElementById('hoursInput');
+    let minutesInput = document.getElementById('minutesInput');
+    
+    function updateTimerFromInputs() {
+      if (!timerState.isRunning && !timerState.isBreak) {
+        let hours = parseInt(hoursInput.value) || 0;
+        let minutes = parseInt(minutesInput.value) || 0;
+        let secs = (hours * 3600) + (minutes * 60);
+        if (secs > 0) {
+          timerState.duration = secs;
+          timerState.remaining = secs;
+          updateTimerDisplay();
+        }
+      }
+    }
+    
+    hoursInput.addEventListener('input', updateTimerFromInputs);
+    minutesInput.addEventListener('input', updateTimerFromInputs);
+    
+    document.querySelectorAll('.quick-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!timerState.isRunning && !timerState.isBreak) {
+          let mins = parseInt(btn.dataset.minutes);
+          let secs = mins * 60;
+          timerState.duration = secs;
+          timerState.remaining = secs;
+          hoursInput.value = Math.floor(secs / 3600);
+          minutesInput.value = Math.floor((secs % 3600) / 60);
+          updateTimerDisplay();
+        }
+      });
+    });
+    
+    document.getElementById('breakDurationInput').addEventListener('change', () => {
+      timerState.breakDuration = parseInt(document.getElementById('breakDurationInput').value) * 60 || 300;
+    });
+    
+    document.getElementById('addSubjectBtn').onclick = async () => {
+      let name = document.getElementById('newSubjName').value.trim();
+      if (name) {
+        store.subjects.push({
+          id: Date.now(),
+          name: name,
+          unitName: document.getElementById('newUnitName').value.trim() || "chapters",
+          totalUnits: parseInt(document.getElementById('newTotalUnits').value) || 10,
+          completedUnits: 0,
+          totalStudySeconds: 0,
+          chapters: [],
+          completedChapters: []
+        });
+        await saveToFirestore();
+        renderSubjects();
+        document.getElementById('newSubjName').value = '';
+        showNotification("📚 Subject Added", `"${name}" has been added to your subjects.`);
+      }
+    };
+    
+    document.getElementById('createNoteBtn').onclick = () => {
+      document.getElementById('noteModalTitle').textContent = 'New Note';
+      document.getElementById('noteTitleInput').value = '';
+      document.getElementById('noteContentInput').value = '';
+      document.getElementById('noteModal').classList.add('show');
+    };
+    
+    document.getElementById('saveNoteBtn').onclick = async () => {
+      let title = document.getElementById('noteTitleInput').value.trim();
+      let content = document.getElementById('noteContentInput').value.trim();
+      if (title) {
+        store.notes.push({ id: Date.now(), title, content, createdAt: new Date().toISOString() });
+        await saveToFirestore();
+        renderNotes();
+        document.getElementById('noteModal').classList.remove('show');
+        showNotification("📝 Note Created", `"${title}" has been saved.`);
+      }
+    };
+    
+    document.getElementById('cancelNoteBtn').onclick = () => document.getElementById('noteModal').classList.remove('show');
+    document.getElementById('clearHistoryBtn').onclick = async () => {
+      showDeleteConfirm(`Are you sure you want to clear ALL session history? This action cannot be undone.`, async () => {
+        store.sessions = [];
+        store.breakSessions = [];
+        await saveToFirestore();
+        updateStats();
+        showNotification("🗑️ History Cleared", "All session history has been cleared.");
+        hideDeleteConfirm();
+      });
+    };
+    
+    const darkToggle = document.getElementById('darkModeToggle');
+    darkToggle.onchange = async (e) => {
+      if (e.target.checked) {
+        document.body.classList.add('dark');
+      } else {
+        document.body.classList.remove('dark');
+      }
+      store.settings.darkMode = e.target.checked;
+      await saveToFirestore();
+    };
+    
+    document.getElementById('soundToggle').onchange = async (e) => {
+      store.settings.soundEnabled = e.target.checked;
+      await saveToFirestore();
+    };
+    
+    document.getElementById('volumeSlider').oninput = async (e) => {
+      store.settings.alarmVolume = parseFloat(e.target.value);
+      await saveToFirestore();
+    };
+    
+    document.getElementById('menuToggle').onclick = () => {
+      document.getElementById('sidebar').classList.add('open');
+      document.getElementById('sidebarOverlay').classList.add('visible');
+    };
+    
+    document.getElementById('closeSidebarBtn').onclick = () => {
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('sidebarOverlay').classList.remove('visible');
+    };
+    
+    document.getElementById('sidebarOverlay').onclick = () => {
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('sidebarOverlay').classList.remove('visible');
+    };
+    
+    document.querySelectorAll('.sidebar-menu li').forEach(li => {
+      li.addEventListener('click', () => {
+        let page = li.dataset.page;
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById(`page-${page}`).classList.add('active');
+        document.querySelectorAll('.sidebar-menu li').forEach(l => l.classList.remove('active'));
+        li.classList.add('active');
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebarOverlay').classList.remove('visible');
+        if (page === 'stats') updateStats();
+        if (page === 'subjects') renderSubjects();
+        if (page === 'notes') renderNotes();
+      });
+    });
+    
+    document.getElementById('logoutBtn').onclick = () => {
+      showLogoutModal();
+    };
+    
+    document.getElementById('confirmLogoutBtn').onclick = () => {
+      performLogout();
+    };
+    
+    document.getElementById('cancelLogoutBtn').onclick = () => {
+      hideLogoutModal();
+    };
+    
+    document.getElementById('closeNotificationBtn').onclick = () => {
+      document.getElementById('notificationModal').classList.remove('show');
+    };
+    
+    document.getElementById('confirmDeleteBtn').onclick = () => {
+      if (pendingDeleteAction) {
+        pendingDeleteAction();
+      }
+    };
+    
+    document.getElementById('cancelDeleteBtn').onclick = () => {
+      hideDeleteConfirm();
+    };
+    
+    document.getElementById('subjectSelectBtn').onclick = () => {
+      let listDiv = document.getElementById('subjectList');
+      listDiv.innerHTML = store.subjects.map(s => `<div class="label-item" data-id="${s.id}">${s.name}</div>`).join('');
+      document.querySelectorAll('#subjectList .label-item').forEach(el => {
+        el.addEventListener('click', () => {
+          timerState.selectedSubjectId = parseInt(el.dataset.id);
+          updateSubjectButton();
+          document.getElementById('subjectModal').classList.remove('show');
+        });
+      });
+      document.getElementById('subjectModal').classList.add('show');
+    };
+    
+    document.getElementById('closeSubjectModal').onclick = () => document.getElementById('subjectModal').classList.remove('show');
+    document.getElementById('closeModalBtn').onclick = () => document.getElementById('completionModal').classList.remove('show');
+    document.getElementById('closeSummaryBtn').onclick = () => document.getElementById('summaryModal').classList.remove('show');
+    document.getElementById('closeViewNoteBtn').onclick = () => document.getElementById('viewNoteModal').classList.remove('show');
+    document.getElementById('closeDeniedModal').onclick = () => document.getElementById('accessDeniedModal').classList.remove('show');
+    
+    if (store.settings.darkMode) {
+      document.body.classList.add('dark');
+      darkToggle.checked = true;
+    }
+    document.getElementById('soundToggle').checked = store.settings.soundEnabled;
+    document.getElementById('volumeSlider').value = store.settings.alarmVolume;
+  }
+  
+  // STRICT AUTH RULE: Only show login screen if user is NOT authenticated
+  // On successful login, NEVER show access denied popup
+  auth.onAuthStateChanged((user) => {
+    if (user) {
+      // User is logged in - show app, hide login screen
+      currentUser = user;
+      
+      // Only initialize app if not already initialized or if first load
+      if (isInitialLoad || !document.getElementById('subjectsList').innerHTML) {
+        initApp();
+        isInitialLoad = false;
+      }
+      
+      document.getElementById('app').style.display = 'flex';
+      document.getElementById('authOverlay').style.display = 'none';
+      
+      // Reset sign in button state
+      const signInBtn = document.getElementById('signInButton');
+      if (signInBtn) {
+        signInBtn.disabled = false;
+        signInBtn.textContent = 'Sign in →';
+      }
+      
+      // Clear any error messages
+      const errorDiv = document.getElementById('authError');
+      if (errorDiv) errorDiv.textContent = '';
+      
+    } else {
+      // User is NOT logged in - show login screen, hide app
+      document.getElementById('app').style.display = 'none';
+      document.getElementById('authOverlay').style.display = 'flex';
+      
+      // Reset sign in button state
+      const signInBtn = document.getElementById('signInButton');
+      if (signInBtn) {
+        signInBtn.disabled = false;
+        signInBtn.textContent = 'Sign in →';
+      }
+    }
+  });
+  
+  // STRICT RULE: Access denied popup ONLY on failed login, NEVER on success
+  document.getElementById('authForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    const errorDiv = document.getElementById('authError');
+    const signInBtn = document.getElementById('signInButton');
+    
+    // Clear previous errors
+    errorDiv.textContent = '';
+    signInBtn.disabled = true;
+    signInBtn.textContent = 'Signing in...';
+    
+    try {
+      // Attempt login
+      await auth.signInWithEmailAndPassword(email, password);
+      // SUCCESS: Do NOT show access denied modal - this is strict rule
+      // Auth state change will handle UI update
+      
+    } catch (err) {
+      // FAILURE: Show error message and access denied modal
+      let errorMsg = "Invalid email or password. ";
+      if (err.code === 'auth/user-not-found') errorMsg = "User not found. ";
+      else if (err.code === 'auth/wrong-password') errorMsg = "Wrong password. ";
+      else if (err.code === 'auth/invalid-email') errorMsg = "Invalid email format. ";
+      errorMsg += "Contact @aatifdecoded on Instagram or email aatifthebrand@gmail.com for access.";
+      errorDiv.textContent = errorMsg;
+      
+      // ONLY show access denied modal on FAILED login
+      document.getElementById('accessDeniedModal').classList.add('show');
+      
+      signInBtn.disabled = false;
+      signInBtn.textContent = 'Sign in →';
+    }
+  });
+</script>
+</body>
+</html>
